@@ -1,0 +1,9 @@
+{
+  "source": "https://arxiv.org/abs/2307.06350",
+  "title": "T2I-CompBench",
+  "facts": [
+    "T2I-CompBench is an open-world compositional text-to-image benchmark.",
+    "T2I-CompBench covers attribute binding, object relationships, and complex compositions.",
+    "T2I-CompBench includes color binding, shape binding, texture binding, and spatial relationships."
+  ]
+}

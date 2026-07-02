@@ -1,0 +1,9 @@
+{
+  "source": "https://arxiv.org/abs/2311.04287",
+  "title": "HEIM",
+  "facts": [
+    "HEIM is a holistic benchmark for text-to-image models.",
+    "HEIM studies 12 aspects across 62 scenarios.",
+    "HEIM finds no single model leads all evaluated aspects."
+  ]
+}

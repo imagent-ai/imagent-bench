@@ -1,0 +1,13 @@
+{
+  "title": "Launch Readiness Board",
+  "layout": "three_panel",
+  "sections": ["Scope", "Risks", "Owners"],
+  "required_text": ["Launch Readiness Board", "Scope", "Risks", "Owners"],
+  "highlights": ["Freeze blocker count: 2", "Primary owner: Release Ops"],
+  "items": [
+    {"label": "Scope", "text": "Messaging freeze and launch checklist"},
+    {"label": "Risks", "text": "Localization sign-off pending"},
+    {"label": "Owners", "text": "Release Ops and QA"}
+  ],
+  "visual_constraints": {"density": "compact", "typography": "mono"}
+}

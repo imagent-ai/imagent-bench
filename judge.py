@@ -15,7 +15,6 @@ compute_scores.py methodology and saved alongside the per-row output.
 import argparse
 import base64
 import json
-import os
 import sys
 from collections import defaultdict
 from io import BytesIO
@@ -38,10 +37,18 @@ from score_utils import (
     extract_json_from_response,
     fix_score_json,
 )
-from backends.openrouter_backend import (
+from backends.openrouter_backend import OpenRouterJudge
+from runtime_config import (
+    DEFAULT_HF_DATASET_FILENAME,
     DEFAULT_OPENROUTER_BASE_URL,
-    DEFAULT_OPENROUTER_MODEL,
-    OpenRouterJudge,
+    DEFAULT_OPENROUTER_MAX_CONCURRENT_REQUESTS,
+    DEFAULT_OPENROUTER_MAX_NEW_TOKENS,
+    DEFAULT_OPENROUTER_MAX_RETRIES,
+    DEFAULT_OPENROUTER_REQUEST_TIMEOUT,
+    DEFAULT_OPENROUTER_SITE_TITLE,
+    DEFAULT_OPENROUTER_TEMPERATURE,
+    DEFAULT_OPENROUTER_TOP_P,
+    resolve_judge_runtime_config,
 )
 
 
@@ -52,9 +59,6 @@ DIM_OUTPUT_MAP = {
     "Real-world Fidelity": "real_world_fidelity_judge_output",
     "Creative Generation": "creative_generation_judge_output",
 }
-
-DEFAULT_HF_DATASET_FILENAME = "image_bench_responses.jsonl"
-
 
 def load_and_resize_image(path):
     """Load image and downscale large inputs while preserving aspect ratio."""
@@ -274,16 +278,19 @@ def _run_batch_inference(judge, args, input_df, metadata_df, desc):
 
 def run_openrouter_inference(args, input_df, metadata_df):
     """Run inference using the OpenRouter chat-completions API."""
-    print(f"Using OpenRouter model: {args.model}")
+    print(f"Using OpenRouter model: {args.runtime.model}")
     judge = OpenRouterJudge(
-        model=args.model,
-        max_batch_size=args.max_batch_size,
-        max_new_tokens=args.max_new_tokens,
-        api_key=args.openrouter_api_key,
-        base_url=args.openrouter_base_url,
-        request_timeout=args.request_timeout,
-        site_url=args.openrouter_site_url,
-        site_title=args.openrouter_site_title,
+        model=args.runtime.model,
+        api_key=args.runtime.api_key,
+        max_batch_size=args.runtime.max_batch_size,
+        max_new_tokens=args.runtime.max_new_tokens,
+        base_url=args.runtime.base_url,
+        request_timeout=args.runtime.request_timeout,
+        site_url=args.runtime.site_url,
+        site_title=args.runtime.site_title,
+        max_retries=args.runtime.max_retries,
+        temperature=args.runtime.temperature,
+        top_p=args.runtime.top_p,
     )
     print("OpenRouter client configured successfully.")
     return _run_batch_inference(judge, args, input_df, metadata_df, desc="API inference")
@@ -462,58 +469,104 @@ def main():
     parser.add_argument("--input", required=True, help="Input CSV/JSON/JSONL with ID, prompt, image_path")
     parser.add_argument(
         "--model",
-        default=os.getenv("OPENROUTER_MODEL", DEFAULT_OPENROUTER_MODEL),
-        help=(
-            "OpenRouter model slug "
-            f"(default: {os.getenv('OPENROUTER_MODEL', DEFAULT_OPENROUTER_MODEL)})"
-        ),
+        default=None,
+        help="OpenRouter model slug (default: OPENROUTER_MODEL env var)",
     )
     parser.add_argument(
         "--openrouter-api-key",
-        default=os.getenv("OPENROUTER_API_KEY"),
+        default=None,
         help="OpenRouter API key (default: OPENROUTER_API_KEY env var)",
     )
     parser.add_argument(
         "--openrouter-base-url",
-        default=os.getenv("OPENROUTER_BASE_URL", DEFAULT_OPENROUTER_BASE_URL),
+        default=None,
         help=(
             "OpenRouter API base URL "
-            f"(default: {os.getenv('OPENROUTER_BASE_URL', DEFAULT_OPENROUTER_BASE_URL)})"
+            f"(default: OPENROUTER_BASE_URL env var or {DEFAULT_OPENROUTER_BASE_URL})"
         ),
     )
     parser.add_argument(
         "--openrouter-site-url",
-        default=os.getenv("OPENROUTER_SITE_URL"),
-        help="Optional HTTP-Referer header for OpenRouter ranking attribution",
+        default=None,
+        help="Optional HTTP-Referer header for OpenRouter ranking attribution (default: OPENROUTER_SITE_URL env var)",
     )
     parser.add_argument(
         "--openrouter-site-title",
-        default=os.getenv("OPENROUTER_SITE_TITLE", "Image Bench"),
-        help="Optional X-OpenRouter-Title header (default: Image Bench)",
+        default=None,
+        help=(
+            "Optional X-OpenRouter-Title header "
+            f"(default: OPENROUTER_SITE_TITLE env var or {DEFAULT_OPENROUTER_SITE_TITLE})"
+        ),
     )
     parser.add_argument("--hf-bench-repo", default=None, help="HF dataset repo for bench metadata")
     parser.add_argument(
         "--hf-filename",
-        default=DEFAULT_HF_DATASET_FILENAME,
-        help=f"Dataset filename inside --hf-bench-repo (default: {DEFAULT_HF_DATASET_FILENAME})",
+        default=None,
+        help=(
+            "Dataset filename inside --hf-bench-repo "
+            f"(default: IMAGE_BENCH_HF_FILENAME env var or {DEFAULT_HF_DATASET_FILENAME})"
+        ),
     )
     parser.add_argument("--local-metadata", default=None, help="Local metadata file path (skip HF download)")
     parser.add_argument(
         "--max-batch-size",
         type=int,
-        default=24,
-        help="Maximum number of concurrent OpenRouter requests (default: 24)",
+        default=None,
+        help=(
+            "Maximum number of concurrent OpenRouter requests "
+            f"(default: OPENROUTER_MAX_CONCURRENT_REQUESTS env var or {DEFAULT_OPENROUTER_MAX_CONCURRENT_REQUESTS})"
+        ),
     )
-    parser.add_argument("--max-new-tokens", type=int, default=4096)
+    parser.add_argument(
+        "--openrouter-max-retries",
+        type=int,
+        default=None,
+        help=(
+            "Retry count for transient OpenRouter failures "
+            f"(default: OPENROUTER_MAX_RETRIES env var or {DEFAULT_OPENROUTER_MAX_RETRIES})"
+        ),
+    )
+    parser.add_argument(
+        "--temperature",
+        type=float,
+        default=None,
+        help=(
+            "Sampling temperature "
+            f"(default: OPENROUTER_TEMPERATURE env var or {DEFAULT_OPENROUTER_TEMPERATURE})"
+        ),
+    )
+    parser.add_argument(
+        "--top-p",
+        type=float,
+        default=None,
+        help=f"Nucleus sampling value (default: OPENROUTER_TOP_P env var or {DEFAULT_OPENROUTER_TOP_P})",
+    )
+    parser.add_argument(
+        "--max-new-tokens",
+        type=int,
+        default=None,
+        help=(
+            "Maximum completion tokens "
+            f"(default: OPENROUTER_MAX_NEW_TOKENS env var or {DEFAULT_OPENROUTER_MAX_NEW_TOKENS})"
+        ),
+    )
     parser.add_argument(
         "--request-timeout",
         type=int,
-        default=120,
-        help="Per-request timeout in seconds for OpenRouter calls (default: 120)",
+        default=None,
+        help=(
+            "Per-request timeout in seconds for OpenRouter calls "
+            f"(default: OPENROUTER_REQUEST_TIMEOUT env var or {DEFAULT_OPENROUTER_REQUEST_TIMEOUT})"
+        ),
     )
 
     args = parser.parse_args()
-    args.batch_size = args.max_batch_size
+    try:
+        args.runtime = resolve_judge_runtime_config(args)
+    except ValueError as exc:
+        print(f"ERROR: {exc}")
+        sys.exit(1)
+    args.batch_size = args.runtime.max_batch_size
 
     # Load input
     print(f"Loading input: {args.input}")
@@ -530,7 +583,7 @@ def main():
     metadata_df = load_bench_metadata(
         hf_bench_repo=args.hf_bench_repo,
         local_metadata=args.local_metadata,
-        hf_filename=args.hf_filename,
+        hf_filename=args.runtime.hf_filename,
     )
     print(f"Metadata: {len(metadata_df)} rows")
 

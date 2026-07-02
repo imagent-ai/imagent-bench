@@ -4,7 +4,15 @@
   <a href="https://www.apache.org/licenses/LICENSE-2.0"><img src="https://img.shields.io/badge/License-Apache_2.0-blue" alt="License"></a>
 </p>
 
-An evaluation toolkit for text-to-image generation models. It runs a judge model over generated images and aggregates scores across 5 top-level dimensions:
+An evaluation toolkit and official runner for `imagent` image agents. It has two
+entrypoint families:
+
+- `imagent-bench run`: execute an agent repository against the official suite and
+  write a canonical benchmark report.
+- `judge.py` / `compute_scores.py`: score already-generated images with the
+  OpenRouter judge workflow.
+
+The judge workflow evaluates generated images and aggregates scores across 5 top-level dimensions:
 
 - Quality
 - Aesthetics
@@ -27,7 +35,106 @@ source .venv/bin/activate
 
 # 3. Install Python dependencies
 uv pip install -r requirements.txt
+uv pip install -e ".[dev]"
+```
 
+## Official Agent Benchmark
+
+Run the deterministic official suite against a local `imagent` checkout:
+
+```bash
+imagent-bench run \
+  --repository ../imagent \
+  --config configs/official.json \
+  --output-dir benchmark-output \
+  --fail-on-policy
+```
+
+The runner:
+
+1. loads the candidate repository's `agent/agent.yaml`;
+2. instantiates the declared `module:Class` entrypoint;
+3. calls `setup(config, workdir)`;
+4. executes every case in `src/imagent_bench/suites/official_v1/cases.jsonl`;
+5. verifies public expected checks;
+6. writes `benchmark-report.json` and `benchmark-summary.md`.
+
+The default official config uses the agent's mock backend and mock verifier. That
+keeps pull-request benchmarking deterministic and avoids exposing provider
+secrets to untrusted code.
+
+### Z.AI Live Smoke Test
+
+Use this when you want to verify real image generation with a Z.AI API key. It
+generates one image with `glm-image` through Z.AI's image generation endpoint
+and writes the normal benchmark report/artifacts.
+
+```bash
+export ZAI_API_KEY=<your-zai-api-key>
+
+imagent-bench run \
+  --repository ../imagent \
+  --config configs/zai-live-smoke.json \
+  --output-dir benchmark-output-zai \
+  --fail-on-policy
+```
+
+This is a smoke test, not the official PR gate. It intentionally uses one case,
+one candidate, no feedback rounds, and no raster-image text assertion so it does
+not require a paid vision judge call after image generation.
+
+### OpenRouter Live Smoke Test
+
+Use this when you want to verify real image generation through OpenRouter's
+dedicated Image API.
+
+```bash
+export OPENROUTER_API_KEY=<your-openrouter-api-key>
+
+imagent-bench run \
+  --repository ../imagent \
+  --config configs/openrouter-live-smoke.json \
+  --output-dir benchmark-output-openrouter \
+  --fail-on-policy
+```
+
+This also runs one case, one candidate, no feedback rounds, and no raster-image
+text assertion. It verifies the real provider path and writes the normal report,
+image artifact, trace, and logs. The config uses `openai/gpt-image-1-mini` with
+`quality: low` to keep smoke-test cost low.
+
+### Runner API
+
+```python
+from imagent_bench import run
+
+result = run(
+    repository="../imagent",
+    commit="abc123",
+    config="configs/official.json",
+    output_dir="benchmark-output",
+)
+```
+
+The returned result is serializable through `result.to_dict()` and has the same
+shape as `benchmark-output/benchmark-report.json`.
+
+### Report Contract
+
+The canonical report schema lives at
+`schemas/benchmark-report.schema.json`. The report includes:
+
+- overall status and score;
+- benchmark and dataset versions;
+- commit SHA;
+- per-case scores, checks, latency, cost, and artifacts;
+- aggregate latency/cost metrics;
+- policy thresholds and failure reasons;
+- logs and generated image/trace artifacts.
+
+## Judge Existing Images
+
+```bash
 # 4. Create a local .env file
 cp .env.example .env
 

@@ -1,0 +1,32 @@
+{
+  "benchmark_version": "official-v1",
+  "dataset_version": "official-v1.0.0",
+  "suite": "official_v1",
+  "agent_config": {
+    "runtime": {
+      "max_feedback_rounds": 1
+    },
+    "agent": {
+      "image_backend": {
+        "mode": "mock"
+      },
+      "verifier": {
+        "provider": "mock_text"
+      }
+    },
+    "evaluation": {
+      "image_judge": {
+        "provider": "mock_text"
+      }
+    }
+  },
+  "execution": {
+    "install": false
+  },
+  "policy": {
+    "minimum_score": 100.0,
+    "max_failed_cases": 0,
+    "max_cost_usd": 0.0,
+    "max_latency_p95_ms": 30000.0
+  }
+}

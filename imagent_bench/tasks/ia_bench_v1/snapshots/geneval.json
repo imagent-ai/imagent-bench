@@ -1,9 +1,0 @@
-{
-  "source": "https://arxiv.org/abs/2310.11513",
-  "title": "GenEval",
-  "facts": [
-    "GenEval is an object-focused text-to-image benchmark.",
-    "GenEval measures count, position, color, and object co-occurrence.",
-    "GenEval finds weaknesses in spatial relations and attribute binding."
-  ]
-}

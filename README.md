@@ -28,8 +28,9 @@ source .venv/bin/activate
 # 3. Install Python dependencies
 uv pip install -r requirements.txt
 
-# 4. Set your OpenRouter API key
+# 4. Set your OpenRouter configuration
 export OPENROUTER_API_KEY=<your-openrouter-api-key>
+export OPENROUTER_MODEL=openai/gpt-5.5
 
 # 5. Run the judge on your images
 python3 judge.py \
@@ -56,10 +57,11 @@ source .venv/bin/activate
 uv pip install -r requirements.txt
 ```
 
-Then provide an OpenRouter API key:
+Then provide your OpenRouter runtime configuration:
 
 ```bash
 export OPENROUTER_API_KEY=<your-openrouter-api-key>
+export OPENROUTER_MODEL=openai/gpt-5.5
 ```
 
 ## Usage
@@ -78,24 +80,56 @@ Optional metadata sources:
 
 OpenRouter model notes:
 
-- The default model slug is `openai/gpt-5.5`.
+- The judge no longer hardcodes a model slug.
+- Set `OPENROUTER_MODEL` or pass `--model`.
+- Operational settings can be configured by env variables without editing code.
+
+#### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `OPENROUTER_API_KEY` | required | OpenRouter API key |
+| `OPENROUTER_MODEL` | required | OpenRouter model slug |
+| `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | OpenRouter base URL |
+| `OPENROUTER_SITE_URL` | — | Optional `HTTP-Referer` header |
+| `OPENROUTER_SITE_TITLE` | `Image Bench` | Optional `X-OpenRouter-Title` header |
+| `IMAGE_BENCH_HF_FILENAME` | `image_bench_responses.jsonl` | Dataset filename used with `--hf-bench-repo` or `--hf-repo` |
+| `OPENROUTER_MAX_CONCURRENT_REQUESTS` | `24` | Maximum concurrent OpenRouter requests |
+| `OPENROUTER_MAX_RETRIES` | `3` | Retry count for transient API failures |
+| `OPENROUTER_TEMPERATURE` | `0.0` | Sampling temperature |
+| `OPENROUTER_TOP_P` | `1.0` | Nucleus sampling value |
+| `OPENROUTER_MAX_NEW_TOKENS` | `4096` | Max generation tokens |
+| `OPENROUTER_REQUEST_TIMEOUT` | `120` | Per-request timeout in seconds |
 
 #### CLI Options
 
 | Argument | Default | Description |
 |----------|---------|-------------|
 | `--input` | required | Input CSV/JSON/JSONL with `ID`, `prompt`, `image_path` |
-| `--model` | `openai/gpt-5.5` | OpenRouter model slug |
+| `--model` | `OPENROUTER_MODEL` | OpenRouter model slug |
 | `--openrouter-api-key` | `OPENROUTER_API_KEY` | OpenRouter API key |
-| `--openrouter-base-url` | `https://openrouter.ai/api/v1` | OpenRouter base URL |
-| `--openrouter-site-url` | — | Optional `HTTP-Referer` header |
-| `--openrouter-site-title` | `Image Bench` | Optional `X-OpenRouter-Title` header |
+| `--openrouter-base-url` | `OPENROUTER_BASE_URL` or `https://openrouter.ai/api/v1` | OpenRouter base URL |
+| `--openrouter-site-url` | `OPENROUTER_SITE_URL` | Optional `HTTP-Referer` header |
+| `--openrouter-site-title` | `OPENROUTER_SITE_TITLE` or `Image Bench` | Optional `X-OpenRouter-Title` header |
 | `--hf-bench-repo` | — | Dataset repo used to fetch metadata |
-| `--hf-filename` | `image_bench_responses.jsonl` | Filename inside `--hf-bench-repo` |
+| `--hf-filename` | `IMAGE_BENCH_HF_FILENAME` or `image_bench_responses.jsonl` | Filename inside `--hf-bench-repo` |
 | `--local-metadata` | — | Local metadata file path |
-| `--max-batch-size` | `24` | Maximum number of concurrent OpenRouter requests |
-| `--max-new-tokens` | `4096` | Max generation tokens |
-| `--request-timeout` | `120` | Per-request timeout in seconds |
+| `--max-batch-size` | `OPENROUTER_MAX_CONCURRENT_REQUESTS` or `24` | Maximum number of concurrent OpenRouter requests |
+| `--openrouter-max-retries` | `OPENROUTER_MAX_RETRIES` or `3` | Retry count for transient API failures |
+| `--temperature` | `OPENROUTER_TEMPERATURE` or `0.0` | Sampling temperature |
+| `--top-p` | `OPENROUTER_TOP_P` or `1.0` | Nucleus sampling value |
+| `--max-new-tokens` | `OPENROUTER_MAX_NEW_TOKENS` or `4096` | Max generation tokens |
+| `--request-timeout` | `OPENROUTER_REQUEST_TIMEOUT` or `120` | Per-request timeout in seconds |
+
+Recommended env variables:
+
+```bash
+export OPENROUTER_API_KEY=<your-openrouter-api-key>
+export OPENROUTER_MODEL=openai/gpt-5.5
+export OPENROUTER_MAX_CONCURRENT_REQUESTS=24
+export OPENROUTER_MAX_NEW_TOKENS=4096
+export OPENROUTER_REQUEST_TIMEOUT=120
+```
 
 #### Output Files
 
@@ -139,14 +173,15 @@ Outputs:
 
 ## Inference Parameters
 
-The judge backend uses fixed inference parameters for reproducibility:
+The judge backend uses these defaults unless you override them via env vars or CLI flags:
 
 | Parameter | Value |
 |-----------|-------|
-| `temperature` | `0` |
+| `temperature` | `0.0` |
 | `top_p` | `1.0` |
 | `max_new_tokens` | `4096` |
 | `max_concurrent_requests` | `24` |
+| `max_retries` | `3` |
 | `request_timeout` | `120s` |
 
 ## Project Structure

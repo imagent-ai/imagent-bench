@@ -14,14 +14,16 @@ from pathlib import Path
 
 import pandas as pd
 
+from runtime_config import (
+    DEFAULT_HF_DATASET_FILENAME,
+    resolve_hf_dataset_filename,
+)
 from score_utils import (
     aggregate_total_score,
     compute_dimension_score,
     extract_json_from_response,
     fix_score_json,
 )
-
-DEFAULT_HF_DATASET_FILENAME = "image_bench_responses.jsonl"
 
 RESPONSE_PREFIX_TO_DIM = {
     "quality_response_": "Quality",
@@ -253,11 +255,15 @@ def main():
     parser.add_argument("--hf-repo", default=None, help="HuggingFace dataset repo ID")
     parser.add_argument(
         "--hf-filename",
-        default=DEFAULT_HF_DATASET_FILENAME,
-        help=f"Dataset filename inside --hf-repo (default: {DEFAULT_HF_DATASET_FILENAME})",
+        default=None,
+        help=(
+            "Dataset filename inside --hf-repo "
+            f"(default: IMAGE_BENCH_HF_FILENAME env var or {DEFAULT_HF_DATASET_FILENAME})"
+        ),
     )
     parser.add_argument("--output-dir", default=None, help="Output directory (default: same as input)")
     args = parser.parse_args()
+    args.hf_filename = resolve_hf_dataset_filename(args.hf_filename)
 
     print("Loading data...")
     records = load_data(

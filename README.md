@@ -28,11 +28,14 @@ source .venv/bin/activate
 # 3. Install Python dependencies
 uv pip install -r requirements.txt
 
-# 4. Set your OpenRouter configuration
-export OPENROUTER_API_KEY=<your-openrouter-api-key>
-export OPENROUTER_MODEL=openai/gpt-5.5
+# 4. Create a local .env file
+cp .env.example .env
 
-# 5. Run the judge on your images
+# 5. Edit .env with your OpenRouter configuration
+#    OPENROUTER_API_KEY=<your-openrouter-api-key>
+#    OPENROUTER_MODEL=openai/gpt-5.5
+
+# 6. Run the judge on your images
 python3 judge.py \
   --input your_data.jsonl
 ```
@@ -57,11 +60,18 @@ source .venv/bin/activate
 uv pip install -r requirements.txt
 ```
 
-Then provide your OpenRouter runtime configuration:
+Then configure your runtime with environment variables. Both `judge.py` and
+`compute_scores.py` auto-load a local `.env` file if present, so the normal flow is:
 
 ```bash
-export OPENROUTER_API_KEY=<your-openrouter-api-key>
-export OPENROUTER_MODEL=openai/gpt-5.5
+cp .env.example .env
+```
+
+And set values in `.env`:
+
+```bash
+OPENROUTER_API_KEY=<your-openrouter-api-key>
+OPENROUTER_MODEL=openai/gpt-5.5
 ```
 
 ## Usage
@@ -81,7 +91,7 @@ Optional metadata sources:
 OpenRouter model notes:
 
 - The judge no longer hardcodes a model slug.
-- Set `OPENROUTER_MODEL` or pass `--model`.
+- Set `OPENROUTER_MODEL` in `.env`/your shell, or pass `--model`.
 - Operational settings can be configured by env variables without editing code.
 
 #### Environment Variables
@@ -124,11 +134,11 @@ OpenRouter model notes:
 Recommended env variables:
 
 ```bash
-export OPENROUTER_API_KEY=<your-openrouter-api-key>
-export OPENROUTER_MODEL=openai/gpt-5.5
-export OPENROUTER_MAX_CONCURRENT_REQUESTS=24
-export OPENROUTER_MAX_NEW_TOKENS=4096
-export OPENROUTER_REQUEST_TIMEOUT=120
+OPENROUTER_API_KEY=<your-openrouter-api-key>
+OPENROUTER_MODEL=openai/gpt-5.5
+OPENROUTER_MAX_CONCURRENT_REQUESTS=24
+OPENROUTER_MAX_NEW_TOKENS=4096
+OPENROUTER_REQUEST_TIMEOUT=120
 ```
 
 #### Output Files

@@ -2,7 +2,7 @@
 Image Bench Judge Model Inference Tool
 
 Evaluate text-to-image generated images using a judge model.
-Uses ms-swift PtEngine for batch inference.
+Uses the OpenRouter chat-completions API for multimodal judge inference.
 
 Per-row output preserves all original input fields plus:
   - judge_model_output: combined raw scores JSON across all L1 dimensions
@@ -13,9 +13,12 @@ compute_scores.py methodology and saved alongside the per-row output.
 """
 
 import argparse
+import base64
 import json
+import os
 import sys
 from collections import defaultdict
+from io import BytesIO
 from pathlib import Path
 
 import pandas as pd
@@ -34,6 +37,11 @@ from score_utils import (
     compute_dimension_score,
     extract_json_from_response,
     fix_score_json,
+)
+from backends.openrouter_backend import (
+    DEFAULT_OPENROUTER_BASE_URL,
+    DEFAULT_OPENROUTER_MODEL,
+    OpenRouterJudge,
 )
 
 
@@ -56,6 +64,14 @@ def load_and_resize_image(path):
         img.thumbnail((1024, 1024), Image.LANCZOS)
     img.load()
     return img
+
+
+def image_to_data_url(image):
+    """Encode a PIL image as a PNG data URL for OpenRouter image input."""
+    buffer = BytesIO()
+    image.save(buffer, format="PNG")
+    encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
+    return f"data:image/png;base64,{encoded}"
 
 
 def load_input_file(file_path):
@@ -184,6 +200,7 @@ def _run_batch_inference(judge, args, input_df, metadata_df, desc):
 
         try:
             img = load_and_resize_image(image_path)
+            image_data_url = image_to_data_url(img)
         except Exception as e:
             image_failures += 1
             skipped_rows.add(row_idx)
@@ -204,7 +221,7 @@ def _run_batch_inference(judge, args, input_df, metadata_df, desc):
             batch_tasks.append({
                 "system_prompt": SYSTEM_PROMPT,
                 "user_text": user_text,
-                "image": img,
+                "image_data_url": image_data_url,
             })
             batch_meta.append((row_idx, level1_dim))
             total_tasks += 1
@@ -255,18 +272,21 @@ def _run_batch_inference(judge, args, input_df, metadata_df, desc):
     return results, parse_failures, all_dim_raw_scores, image_failures
 
 
-def run_ms_swift_inference(args, input_df, metadata_df):
-    """Run inference using ms-swift PtEngine."""
-    from backends.ms_swift_backend import MsSwiftJudge
-
-    print(f"Loading model from: {args.model}")
-    judge = MsSwiftJudge(
-        model_path=args.model,
+def run_openrouter_inference(args, input_df, metadata_df):
+    """Run inference using the OpenRouter chat-completions API."""
+    print(f"Using OpenRouter model: {args.model}")
+    judge = OpenRouterJudge(
+        model=args.model,
         max_batch_size=args.max_batch_size,
         max_new_tokens=args.max_new_tokens,
+        api_key=args.openrouter_api_key,
+        base_url=args.openrouter_base_url,
+        request_timeout=args.request_timeout,
+        site_url=args.openrouter_site_url,
+        site_title=args.openrouter_site_title,
     )
-    print("Model loaded successfully.")
-    return _run_batch_inference(judge, args, input_df, metadata_df, desc="Batch inference")
+    print("OpenRouter client configured successfully.")
+    return _run_batch_inference(judge, args, input_df, metadata_df, desc="API inference")
 
 
 def _empty_result(row):
@@ -440,7 +460,37 @@ def main():
         description="Image Bench Judge Model Inference Tool"
     )
     parser.add_argument("--input", required=True, help="Input CSV/JSON/JSONL with ID, prompt, image_path")
-    parser.add_argument("--model", required=True, help="HuggingFace model ID or local model path")
+    parser.add_argument(
+        "--model",
+        default=os.getenv("OPENROUTER_MODEL", DEFAULT_OPENROUTER_MODEL),
+        help=(
+            "OpenRouter model slug "
+            f"(default: {os.getenv('OPENROUTER_MODEL', DEFAULT_OPENROUTER_MODEL)})"
+        ),
+    )
+    parser.add_argument(
+        "--openrouter-api-key",
+        default=os.getenv("OPENROUTER_API_KEY"),
+        help="OpenRouter API key (default: OPENROUTER_API_KEY env var)",
+    )
+    parser.add_argument(
+        "--openrouter-base-url",
+        default=os.getenv("OPENROUTER_BASE_URL", DEFAULT_OPENROUTER_BASE_URL),
+        help=(
+            "OpenRouter API base URL "
+            f"(default: {os.getenv('OPENROUTER_BASE_URL', DEFAULT_OPENROUTER_BASE_URL)})"
+        ),
+    )
+    parser.add_argument(
+        "--openrouter-site-url",
+        default=os.getenv("OPENROUTER_SITE_URL"),
+        help="Optional HTTP-Referer header for OpenRouter ranking attribution",
+    )
+    parser.add_argument(
+        "--openrouter-site-title",
+        default=os.getenv("OPENROUTER_SITE_TITLE", "Image Bench"),
+        help="Optional X-OpenRouter-Title header (default: Image Bench)",
+    )
     parser.add_argument("--hf-bench-repo", default=None, help="HF dataset repo for bench metadata")
     parser.add_argument(
         "--hf-filename",
@@ -448,9 +498,19 @@ def main():
         help=f"Dataset filename inside --hf-bench-repo (default: {DEFAULT_HF_DATASET_FILENAME})",
     )
     parser.add_argument("--local-metadata", default=None, help="Local metadata file path (skip HF download)")
-    parser.add_argument("--max-batch-size", type=int, default=24,
-                        help="ms-swift PtEngine max_batch_size (default: 24)")
+    parser.add_argument(
+        "--max-batch-size",
+        type=int,
+        default=24,
+        help="Maximum number of concurrent OpenRouter requests (default: 24)",
+    )
     parser.add_argument("--max-new-tokens", type=int, default=4096)
+    parser.add_argument(
+        "--request-timeout",
+        type=int,
+        default=120,
+        help="Per-request timeout in seconds for OpenRouter calls (default: 120)",
+    )
 
     args = parser.parse_args()
     args.batch_size = args.max_batch_size
@@ -475,7 +535,11 @@ def main():
     print(f"Metadata: {len(metadata_df)} rows")
 
     # Run inference
-    results, parse_failures, all_dim_raw_scores, image_failures = run_ms_swift_inference(args, input_df, metadata_df)
+    results, parse_failures, all_dim_raw_scores, image_failures = run_openrouter_inference(
+        args,
+        input_df,
+        metadata_df,
+    )
 
     # Save per-row JSONL
     saved_path = save_output(results, args.input)

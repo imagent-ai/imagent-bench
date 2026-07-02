@@ -3,6 +3,8 @@
 from dataclasses import dataclass
 import os
 
+from dotenv import load_dotenv
+
 DEFAULT_HF_DATASET_FILENAME = "image_bench_responses.jsonl"
 DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 DEFAULT_OPENROUTER_SITE_TITLE = "Image Bench"
@@ -31,6 +33,9 @@ class JudgeRuntimeConfig:
 
 
 def _read_env(name):
+    # Re-load .env during resolution so config works even if callers import this
+    # module before creating or updating a local .env file.
+    load_dotenv(override=False)
     value = os.getenv(name)
     if value is None:
         return None

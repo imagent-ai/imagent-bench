@@ -1,83 +1,185 @@
-# imagent-bench
+# Image Bench
 
-`imagent-bench` provides the benchmark harness, task suite, evaluators, and
-comparison tools used to score image agents. It is designed to be consumed by
-separate agent repositories rather than bundling a built-in agent implementation.
+<p align="center">
+  <a href="https://www.apache.org/licenses/LICENSE-2.0"><img src="https://img.shields.io/badge/License-Apache_2.0-blue" alt="License"></a>
+</p>
+
+An evaluation toolkit for text-to-image generation models. It runs a judge model over generated images and aggregates scores across 5 top-level dimensions:
+
+- Quality
+- Aesthetics
+- Alignment
+- Real-world Fidelity
+- Creative Generation
+
+The scoring hierarchy covers 23 sub-dimensions and 56 fine-grained facets. Per-row outputs preserve the raw judge responses, and the toolkit also produces aggregated benchmark summaries in JSON and Excel.
 
 ## Quick Start
 
 ```bash
-python -m pip install -e ".[dev]"
-python -m imagent_bench.config validate configs/local-smoke.yaml
-python -m imagent_bench.runner \
-  --config configs/local-smoke.yaml \
-  --agent tests/fixtures/echo_agent \
-  --output results/local-smoke
+# 1. Clone the repo
+git clone <your-repo-url> image-bench
+cd image-bench
+
+# 2. Create an environment
+uv venv .venv --python 3.11
+source .venv/bin/activate
+
+# 3. Install PyTorch first
+# https://pytorch.org/get-started/locally/
+
+# 4. Install Python dependencies
+uv pip install -r requirements.txt
+
+# 5. Run the judge on your images
+python3 judge.py \
+  --input your_data.jsonl \
+  --model your-judge-model
 ```
 
-The smoke suite writes normalized JSON results, per-case traces, image
-artifacts, and a Markdown summary under the selected output directory.
+## Input Format
 
-These commands assume a source checkout of this repository. The published wheel
-includes the `imagent_bench` package and bundled task data, but it does not
-install the repository-local `configs/` files.
+Your input file can be CSV, JSON, or JSONL and must include these columns:
 
-## Running an External Agent
+| Column | Type | Description |
+|--------|------|-------------|
+| `ID` | int | Prompt identifier that matches [metadata/bench_metadata.json](metadata/bench_metadata.json) |
+| `prompt` | str | The text prompt used to generate the image |
+| `image_path` | str | Path to the generated image file |
 
-Any agent repository that exposes an `agent.yaml` manifest can be benchmarked by
-path:
+Additional columns are preserved in the judged output.
+
+## Installation
 
 ```bash
-python -m imagent_bench.runner \
-  --config configs/image-agent-smoke.yaml \
-  --agent ../imagent/agent \
-  --output results/image-agent-smoke
+uv venv .venv --python 3.11
+source .venv/bin/activate
+uv pip install -r requirements.txt
 ```
 
-Live generation is configured through `agent.image_backend.mode: live` in the
-benchmark config and requires `OPENROUTER_API_KEY`. Trusted API benchmark runs
-also use that credential for the vision judge configured in
-`configs/api-gate.yaml`.
+Install PyTorch separately for your CUDA or CPU setup:
 
-The offline smoke and PR gate configs use the deterministic `mock_text` image
-judge by default. That provider inspects generated file text for stable contract
-testing; it is not a real visual-quality or semantic image assessment.
+https://pytorch.org/get-started/locally/
 
-The built-in suite is `ia_bench_v1`, a 12-case gate across `plan`, `reason`,
-`search`, `memory`, and `feedback`. It uses repository-authored asset briefs
-plus frozen public benchmark snapshots from GenEval, T2I-CompBench, and HEIM.
-See [imagent_bench/tasks/ia_bench_v1/README.md](imagent_bench/tasks/ia_bench_v1/README.md)
-for the exact contract and source provenance.
+## Usage
 
-The image judge runs through a chat-completions vision API (default model
-`openai/gpt-4o`). This mode reads `OPENROUTER_API_KEY` and reaches many
-vision-capable models through a single credential.
-
-## Result Comparison
-
-Benchmark results can be compared with configurable acceptance rules:
+### Judge New Images
 
 ```bash
-python -m imagent_bench.compare \
-  --config configs/pr-gate.yaml \
-  --baseline results/base/results.json \
-  --candidate results/pr/results.json \
-  --output results/comparison.json
+python3 judge.py \
+  --input your_data.jsonl \
+  --model your-judge-model
 ```
 
-## Baseline Promotion
+Optional metadata sources:
 
-Successful benchmark results can be promoted into baseline history with:
+- `--local-metadata metadata/bench_metadata.json`
+- `--hf-bench-repo your-dataset-repo --hf-filename image_bench_responses.jsonl`
+
+#### CLI Options
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `--input` | required | Input CSV/JSON/JSONL with `ID`, `prompt`, `image_path` |
+| `--model` | required | Hugging Face model ID or local path |
+| `--hf-bench-repo` | — | Dataset repo used to fetch metadata |
+| `--hf-filename` | `image_bench_responses.jsonl` | Filename inside `--hf-bench-repo` |
+| `--local-metadata` | — | Local metadata file path |
+| `--max-batch-size` | `24` | ms-swift `PtEngine` batch size |
+| `--max-new-tokens` | `4096` | Max generation tokens |
+
+#### Output Files
+
+After running `judge.py`, files are written next to the input:
+
+| File | Contents |
+|------|----------|
+| `<input>_judged.csv` | Per-row results for CSV input |
+| `<input>_judged.json` | Per-row results as a JSON array for JSON input |
+| `<input>_judged.jsonl` | Per-row results as JSON lines for JSONL input |
+| `<input>_bench_scores.json` | Aggregated Level-1, Level-2, and total scores |
+| `<input>_bench_scores.xlsx` | Same aggregated scores in Excel |
+
+Per-row result rows include:
+
+- all original input fields
+- `judge_model_output`
+- `quality_judge_output`
+- `aesthetics_judge_output`
+- `alignment_judge_output`
+- `real_world_fidelity_judge_output`
+- `creative_generation_judge_output`
+
+### Compute Scores from Existing Judge Responses
 
 ```bash
-python -m imagent_bench.promote_baseline \
-  --result results/api-main/results.json \
-  --baseline-dir baselines/image_agent/ia_bench_v1_api
+# From a local JSONL file
+python3 compute_scores.py --input image_bench_responses.jsonl
+
+# Or download from a dataset repo
+python3 compute_scores.py \
+  --hf-repo your-dataset-repo \
+  --hf-filename image_bench_responses.jsonl
 ```
 
-This repository can own benchmark baselines directly under `baselines/`. That
-keeps the benchmark contract, benchmark history, and promotion tooling in the
-same place rather than spreading them across agent repos.
+Outputs:
 
-See [docs/ci.md](docs/ci.md) for integration guidance and
-[docs/api_benchmark.md](docs/api_benchmark.md) for trusted API benchmark setup.
+- `scores_result.xlsx`
+- `scores_detail.json`
+- `scores_result_en.xlsx` and `scores_detail_en.json` when `_en` response columns exist
+
+## Inference Parameters
+
+The judge backend uses fixed inference parameters for reproducibility:
+
+| Parameter | Value |
+|-----------|-------|
+| `seed` | `42` |
+| `temperature` | `0` |
+| `top_k` | `1` |
+| `top_p` | `1.0` |
+| `repetition_penalty` | `1.05` |
+| `max_new_tokens` | `4096` |
+| `enable_thinking` | `True` |
+| `max_batch_size` | `24` |
+
+## Project Structure
+
+```text
+.
+├── judge.py
+├── compute_scores.py
+├── score_utils.py
+├── checklists.py
+├── backends/
+│   └── ms_swift_backend.py
+├── metadata/
+│   └── bench_metadata.json
+├── requirements.txt
+└── assets/
+```
+
+## Evaluation Framework
+
+The benchmark uses a 3-level scoring hierarchy:
+
+| Level-1 Dimension | Level-2 Sub-dimensions |
+|-------------------|------------------------|
+| Quality | Realism, Detail, Resolution |
+| Aesthetics | Composition, Color Harmony, Lighting, Anatomical Portraiture, Emotional Expression, Style Control |
+| Alignment | Attributes, Actions, Layout, Relations, Scene |
+| Real-world Fidelity | Fairness, Safety & Compliance, World Knowledge |
+| Creative Generation | Imagination, Feature Matching, Logical Resolution, Text Rendering, Design Applications, Visual Storytelling |
+
+Scoring rules:
+
+- `0` = Fail -> `0`
+- `1` = Pass -> `60`
+- `2` = Excel -> `100`
+- `N/A` = excluded from aggregation
+
+Scores aggregate bottom-up from Level-3 to Level-2 to Level-1 and then to the overall benchmark score.
+
+## License
+
+This project is licensed under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0).

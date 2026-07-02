@@ -1,3 +1,0 @@
-recursive-include configs *.yaml
-recursive-include imagent_bench/schemas *.json
-recursive-include imagent_bench/tasks *.yaml *.json *.jsonl

@@ -3,15 +3,21 @@ OpenRouter chat-completions backend for multimodal image judging.
 """
 
 import json
-import os
 import time
 import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-
-DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-DEFAULT_OPENROUTER_MODEL = "openai/gpt-5.5"
+from runtime_config import (
+    DEFAULT_OPENROUTER_BASE_URL,
+    DEFAULT_OPENROUTER_MAX_NEW_TOKENS,
+    DEFAULT_OPENROUTER_MAX_RETRIES,
+    DEFAULT_OPENROUTER_MAX_CONCURRENT_REQUESTS,
+    DEFAULT_OPENROUTER_REQUEST_TIMEOUT,
+    DEFAULT_OPENROUTER_SITE_TITLE,
+    DEFAULT_OPENROUTER_TEMPERATURE,
+    DEFAULT_OPENROUTER_TOP_P,
+)
 
 
 class ModelUnavailableError(RuntimeError):
@@ -22,29 +28,31 @@ class OpenRouterJudge:
     def __init__(
         self,
         model,
-        max_batch_size=24,
-        max_new_tokens=4096,
-        api_key=None,
+        api_key,
+        max_batch_size=DEFAULT_OPENROUTER_MAX_CONCURRENT_REQUESTS,
+        max_new_tokens=DEFAULT_OPENROUTER_MAX_NEW_TOKENS,
         base_url=DEFAULT_OPENROUTER_BASE_URL,
-        request_timeout=120,
+        request_timeout=DEFAULT_OPENROUTER_REQUEST_TIMEOUT,
         site_url=None,
-        site_title="Image Bench",
-        max_retries=3,
+        site_title=DEFAULT_OPENROUTER_SITE_TITLE,
+        max_retries=DEFAULT_OPENROUTER_MAX_RETRIES,
+        temperature=DEFAULT_OPENROUTER_TEMPERATURE,
+        top_p=DEFAULT_OPENROUTER_TOP_P,
     ):
         self.model = model
         self.max_batch_size = max_batch_size
         self.max_new_tokens = max_new_tokens
-        self.api_key = api_key or os.getenv("OPENROUTER_API_KEY")
+        self.api_key = api_key
         self.base_url = base_url.rstrip("/")
         self.request_timeout = request_timeout
-        self.site_url = site_url or os.getenv("OPENROUTER_SITE_URL")
-        self.site_title = site_title or os.getenv("OPENROUTER_SITE_TITLE") or "Image Bench"
+        self.site_url = site_url
+        self.site_title = site_title
         self.max_retries = max_retries
+        self.temperature = temperature
+        self.top_p = top_p
 
         if not self.api_key:
-            raise ValueError(
-                "OpenRouter API key not provided. Set OPENROUTER_API_KEY or pass --openrouter-api-key."
-            )
+            raise ValueError("OpenRouter API key not provided.")
 
     def generate_batch(self, items):
         """
@@ -92,8 +100,8 @@ class OpenRouterJudge:
             "model": model,
             "messages": messages,
             "max_tokens": self.max_new_tokens,
-            "temperature": 0,
-            "top_p": 1,
+            "temperature": self.temperature,
+            "top_p": self.top_p,
             "stream": False,
         }
 

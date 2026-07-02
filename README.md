@@ -25,16 +25,15 @@ cd image-bench
 uv venv .venv --python 3.11
 source .venv/bin/activate
 
-# 3. Install PyTorch first
-# https://pytorch.org/get-started/locally/
-
-# 4. Install Python dependencies
+# 3. Install Python dependencies
 uv pip install -r requirements.txt
+
+# 4. Set your OpenRouter API key
+export OPENROUTER_API_KEY=<your-openrouter-api-key>
 
 # 5. Run the judge on your images
 python3 judge.py \
-  --input your_data.jsonl \
-  --model your-judge-model
+  --input your_data.jsonl
 ```
 
 ## Input Format
@@ -57,9 +56,11 @@ source .venv/bin/activate
 uv pip install -r requirements.txt
 ```
 
-Install PyTorch separately for your CUDA or CPU setup:
+Then provide an OpenRouter API key:
 
-https://pytorch.org/get-started/locally/
+```bash
+export OPENROUTER_API_KEY=<your-openrouter-api-key>
+```
 
 ## Usage
 
@@ -67,8 +68,7 @@ https://pytorch.org/get-started/locally/
 
 ```bash
 python3 judge.py \
-  --input your_data.jsonl \
-  --model your-judge-model
+  --input your_data.jsonl
 ```
 
 Optional metadata sources:
@@ -76,17 +76,26 @@ Optional metadata sources:
 - `--local-metadata metadata/bench_metadata.json`
 - `--hf-bench-repo your-dataset-repo --hf-filename image_bench_responses.jsonl`
 
+OpenRouter model notes:
+
+- The default model slug is `openai/gpt-5.5`.
+
 #### CLI Options
 
 | Argument | Default | Description |
 |----------|---------|-------------|
 | `--input` | required | Input CSV/JSON/JSONL with `ID`, `prompt`, `image_path` |
-| `--model` | required | Hugging Face model ID or local path |
+| `--model` | `openai/gpt-5.5` | OpenRouter model slug |
+| `--openrouter-api-key` | `OPENROUTER_API_KEY` | OpenRouter API key |
+| `--openrouter-base-url` | `https://openrouter.ai/api/v1` | OpenRouter base URL |
+| `--openrouter-site-url` | — | Optional `HTTP-Referer` header |
+| `--openrouter-site-title` | `Image Bench` | Optional `X-OpenRouter-Title` header |
 | `--hf-bench-repo` | — | Dataset repo used to fetch metadata |
 | `--hf-filename` | `image_bench_responses.jsonl` | Filename inside `--hf-bench-repo` |
 | `--local-metadata` | — | Local metadata file path |
-| `--max-batch-size` | `24` | ms-swift `PtEngine` batch size |
+| `--max-batch-size` | `24` | Maximum number of concurrent OpenRouter requests |
 | `--max-new-tokens` | `4096` | Max generation tokens |
+| `--request-timeout` | `120` | Per-request timeout in seconds |
 
 #### Output Files
 
@@ -134,14 +143,11 @@ The judge backend uses fixed inference parameters for reproducibility:
 
 | Parameter | Value |
 |-----------|-------|
-| `seed` | `42` |
 | `temperature` | `0` |
-| `top_k` | `1` |
 | `top_p` | `1.0` |
-| `repetition_penalty` | `1.05` |
 | `max_new_tokens` | `4096` |
-| `enable_thinking` | `True` |
-| `max_batch_size` | `24` |
+| `max_concurrent_requests` | `24` |
+| `request_timeout` | `120s` |
 
 ## Project Structure
 
@@ -152,7 +158,7 @@ The judge backend uses fixed inference parameters for reproducibility:
 ├── score_utils.py
 ├── checklists.py
 ├── backends/
-│   └── ms_swift_backend.py
+│   └── openrouter_backend.py
 ├── metadata/
 │   └── bench_metadata.json
 ├── requirements.txt

@@ -86,6 +86,8 @@ class CaseResult:
     cost_usd: float
     checks: list[dict[str, Any]]
     artifacts: list[Artifact]
+    dimensions: dict[str, float] | None = None
+    judge: dict[str, Any] | None = None
     error: str | None = None
 
 
@@ -102,6 +104,8 @@ class BenchmarkResult:
     run_id: str
     repository: str
     commit_sha: str
+    pull_request: dict[str, Any] | None
+    contributor: dict[str, Any] | None
     benchmark_version: str
     dataset_version: str
     status: str
@@ -112,6 +116,7 @@ class BenchmarkResult:
     logs: list[Artifact]
     configuration: dict[str, Any]
     policy: PolicyResult
+    ranking: dict[str, Any] | None
     started_at: str
     completed_at: str
     execution_time_ms: float

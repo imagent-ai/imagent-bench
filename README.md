@@ -40,7 +40,7 @@ uv pip install -e ".[dev]"
 
 ## Official Agent Benchmark
 
-Run the deterministic official suite against a local `imagent` checkout:
+Run the deterministic local suite against a local `imagent` checkout:
 
 ```bash
 imagent-bench run \
@@ -59,9 +59,43 @@ The runner:
 5. verifies public expected checks;
 6. writes `benchmark-report.json` and `benchmark-summary.md`.
 
-The default official config uses the agent's mock backend and mock verifier. That
-keeps pull-request benchmarking deterministic and avoids exposing provider
-secrets to untrusted code.
+Benchmarks require OpenRouter for real image generation. If `OPENROUTER_API_KEY`
+is missing or invalid, the run fails instead of falling back to a mock renderer.
+Production contributor PRs use the OpenRouter vision benchmark after the PR
+rules gate passes.
+
+### OpenRouter Vision Benchmark
+
+Use this for paid scoring and merge eligibility. It runs a small multi-case live
+suite, lets the agent use its candidate/feedback loop, scores each case with an
+OpenRouter vision judge, and compares the aggregate result against the current
+top merged baseline score.
+
+Generation is fixed to `google/gemini-3.1-flash-image` through OpenRouter so
+rounds measure agent planning, prompt construction, context use, and iteration
+against one shared underlying image model.
+
+```bash
+export OPENROUTER_API_KEY=<your-openrouter-api-key>
+export IMAGENT_BASELINE_SCORE=82.0
+export IMAGENT_BASELINE_COMMIT=<current-top-commit>
+
+imagent-bench run \
+  --repository ../imagent \
+  --config configs/openrouter-vision-benchmark.json \
+  --baseline-score "$IMAGENT_BASELINE_SCORE" \
+  --baseline-commit "$IMAGENT_BASELINE_COMMIT" \
+  --output-dir benchmark-output-openrouter-vision \
+  --fail-on-policy
+```
+
+The report includes `ranking` metadata:
+
+- `delta`: candidate score minus current top baseline score.
+- `label`: `score-regression`, `improvement-minor`, `improvement-strong`, or
+  `improvement-major`.
+- `merge_eligible`: true only when the configured minimum improvement threshold
+  is met.
 
 ### Z.AI Live Smoke Test
 
@@ -100,8 +134,9 @@ imagent-bench run \
 
 This also runs one case, one candidate, no feedback rounds, and no raster-image
 text assertion. It verifies the real provider path and writes the normal report,
-image artifact, trace, and logs. The config uses `openai/gpt-image-1-mini` with
-`quality: low` to keep smoke-test cost low.
+image artifact, trace, and logs. The config uses the project-standard
+`google/gemini-3.1-flash-image` model through OpenRouter with `resolution: 1K`
+and `aspect_ratio: 1:1`.
 
 ### Runner API
 
@@ -128,6 +163,8 @@ The canonical report schema lives at
 - benchmark and dataset versions;
 - commit SHA;
 - per-case scores, checks, latency, cost, and artifacts;
+- optional per-case judge dimensions and judge metadata;
+- optional baseline ranking and merge eligibility metadata;
 - aggregate latency/cost metrics;
 - policy thresholds and failure reasons;
 - logs and generated image/trace artifacts.

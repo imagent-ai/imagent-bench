@@ -1,10 +1,11 @@
 {
-  "benchmark_version": "official-v1",
-  "dataset_version": "official-v1.0.0",
-  "suite": "official_v1",
+  "benchmark_version": "openrouter-vision-v1.1.0",
+  "dataset_version": "openrouter-vision-v1.1.0",
+  "suite": "openrouter_vision_v1",
   "agent_config": {
     "runtime": {
-      "max_feedback_rounds": 1
+      "max_feedback_rounds": 1,
+      "candidates_per_round": 2
     },
     "agent": {
       "image_backend": {
@@ -20,7 +21,7 @@
         "send_output_format": false,
         "timeout_seconds": 240,
         "referer": "https://tryimagent.com",
-        "title": "imagent official benchmark"
+        "title": "imagent benchmark"
       },
       "verifier": {
         "provider": "openrouter_vision",
@@ -28,7 +29,7 @@
         "model": "google/gemini-2.5-flash",
         "timeout_seconds": 180,
         "referer": "https://tryimagent.com",
-        "title": "imagent official verifier"
+        "title": "imagent internal verifier"
       }
     },
     "evaluation": {
@@ -41,7 +42,15 @@
         "max_tokens": 1200,
         "timeout_seconds": 180,
         "referer": "https://tryimagent.com",
-        "title": "imagent official judge"
+        "title": "imagent benchmark judge",
+        "dimensions": {
+          "prompt_alignment": 0.35,
+          "visual_quality": 0.2,
+          "aesthetics": 0.15,
+          "text_accuracy": 0.15,
+          "layout_and_composition": 0.1,
+          "realism": 0.05
+        }
       }
     }
   },
@@ -49,9 +58,15 @@
     "install": false
   },
   "policy": {
-    "minimum_score": 100.0,
+    "minimum_score": 75.0,
     "max_failed_cases": 0,
-    "max_cost_usd": 999.0,
-    "max_latency_p95_ms": 30000.0
+    "max_cost_usd": 5.0,
+    "max_latency_p95_ms": 300000.0,
+    "minimum_merge_improvement": 1.0,
+    "improvement_thresholds": {
+      "minor": 1.0,
+      "strong": 3.0,
+      "major": 7.0
+    }
   }
 }

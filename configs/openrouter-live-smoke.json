@@ -13,13 +13,14 @@
         "provider": "openrouter",
         "api_key_env": "OPENROUTER_API_KEY",
         "endpoint": "https://openrouter.ai/api/v1/images",
-        "model": "openai/gpt-image-1-mini",
-        "quality": "low",
+        "model": "google/gemini-3.1-flash-image",
+        "resolution": "1K",
+        "aspect_ratio": "1:1",
         "output_format": "png",
         "send_seed": false,
         "send_output_format": false,
         "timeout_seconds": 240,
-        "referer": "https://github.com/imagent-ai/imagent",
+        "referer": "https://tryimagent.com",
         "title": "imagent live smoke"
       },
       "verifier": {

@@ -11,9 +11,7 @@ class AgentLoadError(RuntimeError):
     """Raised when a candidate repository cannot be loaded as an agent."""
 
 
-def resolve_commit_sha(repository: Path, requested_commit: str | None = None) -> str:
-    if requested_commit:
-        return requested_commit
+def resolve_commit_sha(repository: Path) -> str:
     try:
         completed = subprocess.run(
             ["git", "rev-parse", "HEAD"],

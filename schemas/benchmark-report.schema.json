@@ -27,6 +27,26 @@
     "run_id": {"type": "string"},
     "repository": {"type": "string"},
     "commit_sha": {"type": "string"},
+    "pull_request": {
+      "type": ["object", "null"],
+      "properties": {
+        "number": {"type": "integer"},
+        "title": {"type": "string"},
+        "state": {"enum": ["open", "closed", "merged"]},
+        "html_url": {"type": ["string", "null"]},
+        "merged_at": {"type": ["string", "null"]},
+        "closed_at": {"type": ["string", "null"]}
+      }
+    },
+    "contributor": {
+      "type": ["object", "null"],
+      "properties": {
+        "login": {"type": "string"},
+        "name": {"type": ["string", "null"]},
+        "avatar_url": {"type": ["string", "null"]},
+        "html_url": {"type": ["string", "null"]}
+      }
+    },
     "benchmark_version": {"type": "string"},
     "dataset_version": {"type": "string"},
     "status": {"enum": ["pass", "fail"]},
@@ -37,6 +57,19 @@
     "logs": {"type": "array"},
     "configuration": {"type": "object"},
     "policy": {"type": "object"},
+    "ranking": {
+      "type": ["object", "null"],
+      "properties": {
+        "baseline_score": {"type": ["number", "null"]},
+        "baseline_commit": {"type": ["string", "null"]},
+        "candidate_score": {"type": "number"},
+        "delta": {"type": ["number", "null"]},
+        "label": {"type": "string"},
+        "merge_eligible": {"type": "boolean"},
+        "minimum_merge_improvement": {"type": "number"},
+        "thresholds": {"type": "object"}
+      }
+    },
     "started_at": {"type": "string"},
     "completed_at": {"type": "string"},
     "execution_time_ms": {"type": "number", "minimum": 0}

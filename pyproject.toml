@@ -39,3 +39,4 @@ imagent_bench = ["suites/**/*.jsonl", "suites/**/*.json"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+asyncio_default_fixture_loop_scope = "function"

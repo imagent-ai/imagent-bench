@@ -47,6 +47,32 @@ def write_markdown_summary(result: BenchmarkResult, output_dir: Path) -> Path:
         f"- Cost: `${result.metrics['cost_usd']:.6f}`",
         "",
     ]
+    if result.ranking:
+        delta = result.ranking.get("delta")
+        delta_text = "n/a" if delta is None else f"{float(delta):.2f}"
+        lines.extend(
+            [
+                "## Baseline Comparison",
+                "",
+                f"- Baseline score: `{result.ranking.get('baseline_score')}`",
+                f"- Candidate score: `{result.ranking.get('candidate_score')}`",
+                f"- Delta: `{delta_text}`",
+                f"- Label: `{result.ranking.get('label')}`",
+                f"- Merge eligible: `{result.ranking.get('merge_eligible')}`",
+                "",
+            ]
+        )
+    dimension_totals: dict[str, list[float]] = {}
+    for case in result.cases:
+        if not case.dimensions:
+            continue
+        for name, value in case.dimensions.items():
+            dimension_totals.setdefault(name, []).append(float(value))
+    if dimension_totals:
+        lines.extend(["## Dimension Scores", ""])
+        for name, values in sorted(dimension_totals.items()):
+            lines.append(f"- {name}: `{sum(values) / len(values):.2f}`")
+        lines.append("")
     if result.policy.reasons:
         lines.extend(["## Policy", ""])
         lines.extend(f"- {reason}" for reason in result.policy.reasons)

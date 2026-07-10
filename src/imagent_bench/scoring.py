@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import base64
 import html
@@ -125,8 +125,6 @@ def evaluate_openrouter_vision(image_path: Path, *, prompt: str, config: dict[st
     parsed = _parse_judge_json(content)
     dimension_scores = _normalize_dimension_scores(parsed.get("scores", {}), dimensions)
     overall_score = _weighted_score(dimension_scores, dimensions)
-    if isinstance(parsed.get("overall_score"), int | float):
-        overall_score = _clamp_score(float(parsed["overall_score"]))
 
     usage = response_payload.get("usage")
     usage = usage if isinstance(usage, dict) else {}
